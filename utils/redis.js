@@ -1,4 +1,4 @@
-// utils/redis.js
+#!/usr/bin/env node
 
 import { createClient } from 'redis';
 
