@@ -1,107 +1,66 @@
-#!/usr/bin/node
+import mongodb from 'mongodb';
+// eslint-disable-next-line no-unused-vars
+import Collection from 'mongodb/lib/collection';
+import envLoader from './env_loader';
 
-const mongo = require('mongodb');
-const { pwdHashed } = require('./helpers');
-
+/**
+ * Represents a MongoDB client.
+ */
 class DBClient {
+  /**
+   * Creates a new DBClient instance.
+   */
   constructor() {
-    this.connected = false;
-
+    envLoader();
     const host = process.env.DB_HOST || 'localhost';
     const port = process.env.DB_PORT || 27017;
-    const dbName = process.env.DB_DATABASE || 'files_manager';
-    const url = `mongodb://${host}:${port}/${dbName}`;
+    const database = process.env.DB_DATABASE || 'files_manager';
+    const dbURL = `mongodb://${host}:${port}/${database}`;
 
-    this.database = dbName;
-    this.client = new mongo.MongoClient(url, { useUnifiedTopology: true });
-    this.client
-      .connect()
-      .then(() => {
-        this.connected = true;
-      })
-      .catch((err) => {
-        console.log(err.message);
-        this.connected = false;
-      });
+    this.client = new mongodb.MongoClient(dbURL, { useUnifiedTopology: true });
+    this.client.connect();
   }
 
+  /**
+   * Checks if this client's connection to the MongoDB server is active.
+   * @returns {boolean}
+   */
   isAlive() {
-    return this.connected;
+    return this.client.isConnected();
   }
 
+  /**
+   * Retrieves the number of users in the database.
+   * @returns {Promise<Number>}
+   */
   async nbUsers() {
-    try {
-      const users = this.client.db().collection('users');
-      const count = await users.countDocuments();
-      return count;
-    } catch (err) {
-      throw new Error(`Couldn't display number of 'users': ${err}`);
-    }
+    return this.client.db().collection('users').countDocuments();
   }
 
+  /**
+   * Retrieves the number of files in the database.
+   * @returns {Promise<Number>}
+   */
   async nbFiles() {
-    try {
-      const files = this.client.db().collection('files');
-      const count = await files.countDocuments();
-      return count;
-    } catch (err) {
-      throw new Error(`Couldn't display number of 'files': ${err}`);
-    }
+    return this.client.db().collection('files').countDocuments();
   }
 
-  async createUser(email, password) {
-    const hashedPwd = pwdHashed(password);
-    await this.client.connect();
-    const user = await this.client
-      .db(this.database)
-      .collection('users')
-      .insertOne({ email, password: hashedPwd });
-    return user;
+  /**
+   * Retrieves a reference to the `users` collection.
+   * @returns {Promise<Collection>}
+   */
+  async usersCollection() {
+    return this.client.db().collection('users');
   }
 
-  async getUser(email) {
-    await this.client.connect();
-    const user = await this.client
-      .db(this.database)
-      .collection('users')
-      .find({ email })
-      .toArray();
-    if (!user.length) {
-      return null;
-    }
-    return user[0];
-  }
-
-  async getUserById(id) {
-    const _id = new mongo.ObjectID(id);
-    await this.client.connect();
-    const user = await this.client
-      .db(this.database)
-      .collection('users')
-      .find({ _id })
-      .toArray();
-    if (!user.length) {
-      return null;
-    }
-    return user[0];
-  }
-
-  async userExist(email) {
-    const user = await this.getUser(email);
-    if (user) {
-      return true;
-    }
-    return false;
-  }
-
-  async closeDB() {
-    try {
-      await this.client.close();
-    } catch (err) {
-      console.log(`Unable to close the database: ${err}`);
-    }
+  /**
+   * Retrieves a reference to the `files` collection.
+   * @returns {Promise<Collection>}
+   */
+  async filesCollection() {
+    return this.client.db().collection('files');
   }
 }
 
-const dbClient = new DBClient();
-module.exports = dbClient;
+export const dbClient = new DBClient();
+export default dbClient;
